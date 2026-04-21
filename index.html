@@ -101,7 +101,7 @@
         const msg = new SpeechSynthesisUtterance();
         msg.text = isCorrect ? "정답입니다" : "오답입니다";
         msg.lang = 'ko-KR';
-        msg.rate = 1.8;
+        msg.rate = 1;
         window.speechSynthesis.speak(msg);
     }
 
