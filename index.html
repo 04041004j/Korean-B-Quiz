@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>설명 방법 마스터 퀴즈</title>
+    <style>
+        :root { --primary: #4a90e2; --success: #2ecc71; --error: #e74c3c; --bg: #f8f9fa; }
+        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background-color: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        #quiz-container { background: white; width: 90%; max-width: 600px; padding: 2rem; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); position: relative; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .timer-bar { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-bottom: 1.5rem; overflow: hidden; }
+        #timer-progress { width: 100%; height: 100%; background: var(--primary); transition: width 0.1s linear; }
+        .question { font-size: 1.2rem; font-weight: 700; color: #2c3e50; margin-bottom: 1.5rem; line-height: 1.6; min-height: 3.5em; word-break: keep-all; }
+        .options { display: grid; gap: 0.8rem; }
+        button { padding: 1rem; border: 2px solid #edf2f7; border-radius: 12px; background: white; cursor: pointer; transition: all 0.2s; font-size: 1rem; text-align: left; color: #4a5568; outline: none; }
+        button:hover:not(:disabled) { border-color: var(--primary); background: #f0f7ff; }
+        button:disabled { cursor: default; }
+        .correct { background-color: #d1fae5 !important; border-color: var(--success) !important; color: #065f46; font-weight: bold; }
+        .wrong { background-color: #fee2e2 !important; border-color: var(--error) !important; color: #991b1b; }
+        #explanation { margin-top: 1.5rem; padding: 1rem; background: #f1f5f9; border-radius: 10px; display: none; font-size: 0.95rem; border-left: 4px solid var(--primary); line-height: 1.5; color: #334155; }
+        #next-btn { width: 100%; margin-top: 1.5rem; padding: 1rem; background: #2c3e50; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; display: none; font-size: 1.1rem; }
+        #result-area { text-align: center; display: none; }
+        .score-circle { width: 150px; height: 150px; border-radius: 50%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; margin: 2rem auto; font-size: 2.5rem; font-weight: bold; box-shadow: 0 5px 15px rgba(74, 144, 226, 0.3); }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <div id="game-area">
+        <div class="header">
+            <span id="progress-text" style="font-weight: bold; color: #64748b;">문제 1 / 10</span>
+            <span id="timer-text" style="font-weight: bold; color: var(--primary);">남은 시간: 20초</span>
+        </div>
+        <div class="timer-bar"><div id="timer-progress"></div></div>
+        <div class="question" id="question">문제를 불러오는 중...</div>
+        <div class="options" id="options"></div>
+        <div id="explanation"></div>
+        <button id="next-btn" onclick="handleNext()">다음 문제로 →</button>
+    </div>
+    
+    <div id="result-area">
+        <h1>🎮 학습 완료!</h1>
+        <div class="score-circle">
+            <span id="final-score">0</span>
+            <span style="font-size: 1.2rem;">점</span>
+        </div>
+        <p id="feedback-msg" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 2rem; color: #475569;"></p>
+        <button onclick="location.reload()" style="background:var(--primary); color:white; width:100%; padding: 1rem; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 1.1rem;">다시 도전하기</button>
+    </div>
+</div>
+
+<script>
+    // 1. 학습 콘텐츠 (20문제 데이터베이스)
+    const rawData = [
+        // 비교/대조 (키워드: 공통점, 차이점)
+        { q: "두 대상 사이의 '공통점'을 중심으로 설명하는 방법은?", a: ["비교", "대조", "분류", "정의"], correct: 0, exp: "<b>비교</b>는 둘 이상의 대상에서 서로 비슷한 점이나 <b>공통점</b>을 찾아내는 방식입니다." },
+        { q: "두 대상 사이의 '차이점'을 중심으로 설명하는 방법은?", a: ["비교", "대조", "분석", "구분"], correct: 1, exp: "<b>대조</b>는 두 대상의 서로 다른 특징인 <b>차이점</b>을 드러내어 대비시키는 방식입니다." },
+        { q: "'축구와 농구는 모두 팀워크가 중요한 구기 종목이다'에 쓰인 방법은?", a: ["비교", "대조", "예시", "인과"], correct: 0, exp: "두 운동의 <b>공통점</b>을 말하고 있으므로 <b>비교</b>입니다." },
+        { q: "'시는 운율이 있지만 소설은 운율이 없는 산문이다'에 쓰인 방법은?", a: ["비교", "대조", "분류", "정의"], correct: 1, exp: "시와 소설의 <b>차이점</b>을 강조하고 있으므로 <b>대조</b>입니다." },
+        { q: "다음 중 '비교'의 효과로 가장 적절한 것은?", a: ["대상의 차이점을 부각한다.", "대상을 종류별로 묶는다.", "익숙한 것과의 공통점을 통해 이해를 돕는다.", "대상의 구조를 쪼개어 보여준다."], correct: 2, exp: "<b>비교</b>는 공통점을 활용해 독자에게 친숙함을 줍니다." },
+
+        // 구분/분류 (키워드: 나누기, 묶기)
+        { q: "상위 개념을 일정한 기준에 따라 하위 항목으로 '나누는' 방법은?", a: ["분류", "구분", "분석", "정의"], correct: 1, exp: "큰 범주를 기준에 따라 작은 단위로 <b>나누는</b> 것은 <b>구분</b>입니다." },
+        { q: "여러 대상을 일정한 기준에 따라 종류별로 '묶어서' 설명하는 방법은?", a: ["분류", "구분", "인과", "예시"], correct: 0, exp: "흩어져 있는 개별 대상을 성질에 따라 한데 <b>묶는</b> 것은 <b>분류</b>입니다." },
+        { q: "'악기는 연주 방식에 따라 현악기, 관악기, 타악기로 나눌 수 있다'의 방법은?", a: ["분류", "구분", "분석", "정의"], correct: 1, exp: "악기 전체를 종류별로 <b>나누고</b> 있으므로 <b>구분</b>입니다." },
+        { q: "'고래, 개, 호랑이는 모두 포유류로 묶을 수 있다'에 쓰인 방법은?", a: ["구분", "분류", "대조", "비교"], correct: 1, exp: "개별 대상을 포유류라는 범주로 <b>묶고</b> 있으므로 <b>분류</b>입니다." },
+        { q: "분류와 구분을 구별하는 가장 핵심적인 기준은?", a: ["공통점인가 차이점인가", "부분인가 전체인가", "묶는 것인가 나누는 것인가", "뜻풀이인가 사례인가"], correct: 2, exp: "방향에 따라 <b>묶으면 분류, 나누면 구분</b>입니다." },
+
+        // 분석 (키워드: 부분, 구조)
+        { q: "'시계는 시침, 분침, 초침으로 이루어져 있다'에 쓰인 방법은?", a: ["구분", "분류", "분석", "정의"], correct: 2, exp: "대상의 구조나 구성 <b>부분</b>으로 쪼개어 설명하는 <b>분석</b>입니다." },
+        { q: "분석과 구분의 차이점으로 옳은 것은?", a: ["분석은 공통점을 찾고 구분은 차이점을 찾는다.", "분석은 구조적 부분으로 쪼개고 구분은 종류별로 나눈다.", "분석은 묶는 것이고 구분은 나누는 것이다.", "두 방법은 완전히 동일하다."], correct: 1, exp: "<b>분석</b>은 하나를 쪼개는 것, <b>구분</b>은 종류를 나누는 것입니다." },
+
+        // 정의/예시/인과
+        { q: "'문학이란 인간의 삶을 언어로 표현한 예술이다'에 쓰인 방법은?", a: ["정의", "예시", "인과", "비교"], correct: 0, exp: "대상의 뜻을 명확히 규정하는 <b>정의</b>입니다." },
+        { q: "'예를 들어 고전 소설에는 심청전, 흥부전 등이 있다'에 쓰인 방법은?", a: ["정의", "예시", "분류", "구분"], correct: 1, exp: "구체적인 사례를 보여주는 <b>예시</b>입니다." },
+        { q: "'복잡한 개념을 구체적인 사례를 들어 설명하는 방법'은?", a: ["정의", "예시", "비교", "대조"], correct: 1, exp: "이해를 돕기 위해 실례를 드는 <b>예시</b>입니다." },
+        { q: "'열심히 공부했기 때문에 좋은 성적을 받았다'에 쓰인 방법은?", a: ["인과", "분석", "비교", "정의"], correct: 0, exp: "원인과 결과의 관계를 보여주는 <b>인과</b>입니다." },
+
+        // 타당성 평가
+        { q: "설명 방법의 타당성을 판단하는 가장 중요한 기준은?", a: ["글의 길이", "문장의 화려함", "대상의 특성과 독자의 수준", "작가의 유명세"], correct: 2, exp: "대상의 성격에 맞는지와 <b>독자의 이해도</b>가 가장 중요합니다." },
+        { q: "생소한 개념을 설명할 때 '정의'를 먼저 사용하는 것은 타당한가?", a: ["타당하다. 개념을 명확히 규정해야 이해의 기초가 되기 때문이다.", "타당하지 않다. 정의는 항상 어렵기 때문이다.", "타당하다. 하지만 무조건 예시만 써야 한다.", "타당하지 않다. 정의보다는 분석이 항상 옳다."], correct: 0, exp: "개념의 뜻을 먼저 밝히는 것은 독자의 오해를 방지하는 타당한 방법입니다." },
+        { q: "차이점을 강조해야 하는 상황에서 '비교'를 사용하는 것은 타당한가?", a: ["타당하다. 비교와 대조는 같기 때문이다.", "타당하지 않다. 차이점을 부각하려면 대조를 써야 하기 때문이다.", "타당하다. 공통점만 알면 차이점도 알 수 있기 때문이다.", "타당하지 않다. 비교는 묶는 방법이기 때문이다."], correct: 1, exp: "차이점은 <b>대조</b>를 써야 타당한 설명이 됩니다." },
+        { q: "설명 방법이 타당할 때 독자가 얻는 가장 큰 효과는?", a: ["글을 빨리 읽을 수 있다.", "정보를 정확하고 효율적으로 이해한다.", "작가의 감정을 느낄 수 있다.", "어려운 단어를 많이 외우게 된다."], correct: 1, exp: "타당한 설명 방법은 <b>정보 전달의 효율성</b>을 극대화합니다." }
+    ];
+
+    let quizData = [];
+    let currentIdx = 0;
+    let score = 0;
+    let timeLeft = 20;
+    let timerInterval;
+    let isAnswered = false;
+
+    function shuffleData() {
+        // 20문제 중 10문제 무작위 추출
+        const shuffledRaw = [...rawData].sort(() => Math.random() - 0.5);
+        quizData = shuffledRaw.slice(0, 10);
+    }
+
+    function playSound(isCorrect) {
+        const msg = new SpeechSynthesisUtterance();
+        msg.text = isCorrect ? "정답입니다" : "오답입니다";
+        msg.lang = 'ko-KR';
+        msg.rate = 1.8;
+        window.speechSynthesis.speak(msg);
+    }
+
+    function startTimer() {
+        timeLeft = 20;
+        document.getElementById("timer-progress").style.width = "100%";
+        timerInterval = setInterval(() => {
+            timeLeft -= 0.1;
+            const percent = (timeLeft / 20) * 100;
+            document.getElementById("timer-progress").style.width = percent + "%";
+            document.getElementById("timer-text").innerText = `남은 시간: ${Math.ceil(timeLeft)}초`;
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                checkAnswer(-1); // 시간 초과 처리
+            }
+        }, 100);
+    }
+
+    function loadQuestion() {
+        isAnswered = false;
+        clearInterval(timerInterval);
+        const data = quizData[currentIdx];
+        document.getElementById("progress-text").innerText = `문제 ${currentIdx + 1} / 10`;
+        document.getElementById("question").innerText = data.q;
+        document.getElementById("explanation").style.display = "none";
+        document.getElementById("next-btn").style.display = "none";
+        
+        const optionsDiv = document.getElementById("options");
+        optionsDiv.innerHTML = "";
+        
+        // 보기 셔플
+        const shuffledOptions = [...data.a].sort(() => Math.random() - 0.5);
+        
+        shuffledOptions.forEach((opt) => {
+            const btn = document.createElement("button");
+            btn.innerText = opt;
+            btn.onclick = () => {
+                const originalIndex = data.a.indexOf(opt);
+                checkAnswer(originalIndex);
+            };
+            optionsDiv.appendChild(btn);
+        });
+        startTimer();
+    }
+
+    function checkAnswer(idx) {
+        if(isAnswered) return;
+        isAnswered = true;
+        clearInterval(timerInterval);
+        
+        const data = quizData[currentIdx];
+        const buttons = document.querySelectorAll(".options button");
+        buttons.forEach(btn => btn.disabled = true);
+        
+        const correctText = data.a[data.correct];
+        
+        if(idx === data.correct) {
+            buttons.forEach(btn => { if(btn.innerText === correctText) btn.classList.add("correct"); });
+            score += 10;
+            playSound(true);
+        } else {
+            if(idx !== -1) {
+                const wrongText = data.a[idx];
+                buttons.forEach(btn => { if(btn.innerText === wrongText) btn.classList.add("wrong"); });
+            }
+            buttons.forEach(btn => { if(btn.innerText === correctText) btn.classList.add("correct"); });
+            playSound(false);
+        }
+        
+        document.getElementById("explanation").innerHTML = data.exp;
+        document.getElementById("explanation").style.display = "block";
+        document.getElementById("next-btn").style.display = "block";
+    }
+
+    function handleNext() {
+        currentIdx++;
+        if(currentIdx < quizData.length) {
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        document.getElementById("game-area").style.display = "none";
+        document.getElementById("result-area").style.display = "block";
+        document.getElementById("final-score").innerText = score;
+        
+        let msg = "";
+        if(score >= 90) msg = "💯 완벽해요! 설명 방법의 달인이시군요!";
+        else if(score >= 70) msg = "👏 아주 우수한 성적입니다! 핵심 개념을 잘 파악하고 있어요.";
+        else if(score >= 50) msg = "👍 잘했습니다! 헷갈리는 키워드를 조금만 더 복습해 볼까요?";
+        else msg = "📖 괜찮아요! 다시 한번 도전하며 개념을 익혀보세요.";
+        document.getElementById("feedback-msg").innerText = msg;
+    }
+
+    shuffleData();
+    loadQuestion();
+</script>
+</body>
+</html>
